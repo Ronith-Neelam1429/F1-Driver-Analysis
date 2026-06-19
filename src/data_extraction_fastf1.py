@@ -31,6 +31,95 @@ def save_to_csv(data, filename):
     data.to_csv(filepath)
     print(f"✓ Saved {len(data)} records to {filename}")
 
+def extract_telemetry_data(year, round_num, session_type, output_filename):
+    """
+    Extract detailed telemetry data for a specific session.
+    
+    Args:
+        year (int): Year of the season
+        round_num (int): Round number
+        session_type (str): 'Q' for qualifying, 'R' for race
+        output_filename (str): Output CSV filename
+    """
+    print(f"   Extracting telemetry for {session_type}...")
+    
+    try:
+        session = fastf1.get_session(year, round_num, session_type)
+        session.load()
+        
+        telemetry_records = []
+        
+        # Iterate through each driver
+        for driver in session.drivers:
+            try:
+                laps = session.laps.pick_driver(driver)
+                
+                # Iterate through each lap
+                for lap_num, lap in laps.iterrows():
+                    try:
+                        # Get telemetry data for this lap
+                        telemetry = lap.get_telemetry()
+                        
+                        if telemetry is None or telemetry.empty:
+                            continue
+                        
+                        # Add lap and driver information
+                        telemetry['DriverNumber'] = driver
+                        telemetry['Driver'] = lap['Driver']
+                        telemetry['LapNumber'] = lap['LapNumber']
+                        telemetry['LapTime'] = lap['LapTime']
+                        telemetry['Sector1Time'] = lap['Sector1Time']
+                        telemetry['Sector2Time'] = lap['Sector2Time']
+                        telemetry['Sector3Time'] = lap['Sector3Time']
+                        telemetry['Compound'] = lap['Compound']
+                        telemetry['FreshTyre'] = lap['FreshTyre']
+                        telemetry['SessionType'] = session_type
+                        telemetry['Round'] = round_num
+                        telemetry['Year'] = year
+                        
+                        # Calculate time in lap (seconds)
+                        telemetry['TimeInLap'] = (telemetry['Time'] - telemetry['Time'].iloc[0]).dt.total_seconds()
+                        
+                        telemetry_records.append(telemetry)
+                        
+                    except Exception as e:
+                        print(f"      ✗ Error processing lap {lap_num} for driver {driver}: {e}")
+                        continue
+                        
+            except Exception as e:
+                print(f"      ✗ Error processing driver {driver}: {e}")
+                continue
+        
+        if telemetry_records:
+            # Combine all records
+            telemetry_df = pd.concat(telemetry_records, ignore_index=True)
+            
+            # Reorder columns for better readability
+            cols = ['Year', 'Round', 'SessionType', 'DriverNumber', 'Driver', 
+                   'LapNumber', 'TimeInLap', 'Time',
+                   'Position', 'Throttle', 'Brake', 'DRS', 'RPM', 'Speed',
+                   'X', 'Y', 'Z',
+                   'Steering', 'Gear',
+                   'LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time',
+                   'Compound', 'FreshTyre']
+            
+            # Only include columns that exist in the data
+            existing_cols = [col for col in cols if col in telemetry_df.columns]
+            telemetry_df = telemetry_df[existing_cols]
+            
+            filepath = os.path.join(OUTPUT_DIR, output_filename)
+            telemetry_df.to_csv(filepath, index=False)
+            print(f"      ✓ Saved {len(telemetry_df)} telemetry records to {output_filename}")
+            
+            return telemetry_df
+        else:
+            print(f"      ✗ No telemetry data found")
+            return None
+            
+    except Exception as e:
+        print(f"   Error extracting telemetry: {e}")
+        return None
+
 def extract_2025_data():
     """Extract all available 2025 season data from FastF1."""
     
@@ -164,5 +253,27 @@ def extract_2025_data():
     print(f"All files saved to: {os.path.abspath(OUTPUT_DIR)}")
     print("=" * 60)
 
+def extract_australia_2025_telemetry():
+    """Extract detailed telemetry data for Australia 2025 qualifying and race."""
+    
+    print("\n" + "=" * 60)
+    print("Extracting Australia 2025 Telemetry Data")
+    print("=" * 60)
+    
+    # Australia is Round 1 in 2025 season
+    round_num = 1
+    
+    print("\nExtracting Qualifying Telemetry...")
+    extract_telemetry_data(2025, round_num, 'Q', 'australia_2025_telemetry_qualifying.csv')
+    
+    print("\nExtracting Race Telemetry...")
+    extract_telemetry_data(2025, round_num, 'R', 'australia_2025_telemetry_race.csv')
+    
+    print("\n" + "=" * 60)
+    print("Australia 2025 telemetry extraction completed!")
+    print(f"Files saved to: {os.path.abspath(OUTPUT_DIR)}")
+    print("=" * 60)
+
 if __name__ == "__main__":
     extract_2025_data()
+    extract_australia_2025_telemetry()
