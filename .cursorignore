@@ -1,0 +1,3 @@
+# Large CSVs crash the editor; sample files are small enough to preview.
+data/raw_data/**/*.csv
+data/processed/australia_2025_quali_telemetry_processed.csv

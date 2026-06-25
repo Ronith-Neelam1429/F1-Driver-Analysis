@@ -3,15 +3,22 @@ FastF1 API data extraction for 2025 F1 season.
 Fetches all available data from the FastF1 library and saves to CSV files.
 """
 
+import os
+import sys
+import warnings
+from pathlib import Path
+
 import fastf1
 import pandas as pd
-import os
-from datetime import datetime
-import warnings
 
 warnings.filterwarnings('ignore')
 
-OUTPUT_DIR = "data/raw_data/fastf1"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.paths import RAW_FASTF1_DIR
+
+OUTPUT_DIR = str(RAW_FASTF1_DIR)
 
 # Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)

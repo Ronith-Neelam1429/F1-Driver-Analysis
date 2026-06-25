@@ -20,10 +20,11 @@ ENV/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Data files
+# Data files (keep large raw CSVs local; track compressed processed outputs)
 data/raw/
-data/processed/
 *.csv
+!data/processed/*.csv.gz
+!data/processed/*_sample.csv
 *.xlsx
 
 # Results and outputs
