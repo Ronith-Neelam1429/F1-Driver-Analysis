@@ -49,3 +49,17 @@ jupyter notebook
 ```
 
 Then create a new notebook in the `notebooks/` folder to start your analysis.
+
+## Dashboard
+
+An interactive Streamlit dashboard visualizes the Australia 2025 qualifying
+telemetry (classification, per-driver traces, an interactive track map, driver
+comparison, and corner analysis):
+
+```bash
+streamlit run dashboard/app.py
+```
+
+It loads the processed data via `src/data_io.py` (reads the committed
+`.csv.gz` directly — no decompression needed). If the processed file is
+missing, generate it first with `python process_telemetry.py`.

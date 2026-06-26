@@ -7,3 +7,5 @@ jupyter>=1.0.0
 ipython>=8.14.0
 fastf1>=3.8.3
 requests>=2.31.0
+streamlit>=1.33.0
+plotly>=5.20.0

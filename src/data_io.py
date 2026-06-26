@@ -1,5 +1,7 @@
 """Read/write helpers for CSV and compressed CSV data."""
 
+from __future__ import annotations
+
 import gzip
 import shutil
 from pathlib import Path
