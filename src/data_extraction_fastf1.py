@@ -156,7 +156,11 @@ def extract_2025_data():
     for idx, event in schedule.iterrows():
         round_num = event['RoundNumber']
         gp_name = event['EventName']
-        
+
+        if round_num == 0:
+            print(f"   Skipping round {round_num} ({gp_name}) - testing session")
+            continue
+
         # Skip cancelled events
         if event['EventDate'] == 'NaT' or pd.isna(event['EventDate']):
             print(f"   Skipping round {round_num} ({gp_name}) - No date")
@@ -165,12 +169,6 @@ def extract_2025_data():
         print(f"\n   Round {round_num}: {gp_name}")
         
         try:
-            # Load all sessions for this round (Practice, Qualifying, Race, etc.)
-            sessions_for_round = fastf1.get_session(2025, round_num, identifier=None)
-            
-            if sessions_for_round is None:
-                continue
-            
             # Get Race session data
             try:
                 race = fastf1.get_session(2025, round_num, 'R')
@@ -248,11 +246,9 @@ def extract_2025_data():
     
     if all_laps:
         laps_df = pd.concat(all_laps, ignore_index=True)
-        # Convert LapTime to total seconds for easier analysis
-        laps_df['LapTime_seconds'] = laps_df['LapTime'].dt.total_seconds()
-        laps_df['Sector1Time_seconds'] = laps_df['Sector1Time'].dt.total_seconds()
-        laps_df['Sector2Time_seconds'] = laps_df['Sector2Time'].dt.total_seconds()
-        laps_df['Sector3Time_seconds'] = laps_df['Sector3Time'].dt.total_seconds()
+        for col in ('LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time'):
+            if col in laps_df.columns:
+                laps_df[f'{col}_seconds'] = pd.to_timedelta(laps_df[col], errors='coerce').dt.total_seconds()
         save_to_csv(laps_df, "laps_2025.csv")
     
     print("\n" + "=" * 60)

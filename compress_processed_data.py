@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compress processed CSV files for git-friendly storage."""
+"""Compress all processed CSV files for git-friendly storage."""
 
 import gzip
 import shutil
@@ -9,12 +9,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.paths import PROCESSED_DIR, QUALIFYING_PROCESSED
+from src.paths import PROCESSED_DIR
 
 
 def compress_file(csv_path: Path) -> Path | None:
     if not csv_path.exists():
-        print(f"Skip (missing): {csv_path.name}")
         return None
 
     gz_path = Path(str(csv_path) + ".gz")
@@ -30,13 +29,15 @@ def compress_file(csv_path: Path) -> Path | None:
 
 def main():
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-    targets = [QUALIFYING_PROCESSED]
 
-    for csv in targets:
-        compress_file(csv)
+    for csv_path in sorted(PROCESSED_DIR.glob("*.csv")):
+        if csv_path.name.endswith("_sample.csv"):
+            continue
+        compress_file(csv_path)
 
-    for gz in PROCESSED_DIR.glob("*.csv.gz"):
-        print(f"Ready for git: {gz.relative_to(PROJECT_ROOT)}")
+    gz_files = sorted(PROCESSED_DIR.glob("*.csv.gz"))
+    sample_files = sorted(PROCESSED_DIR.glob("*_sample.csv"))
+    print(f"\nReady for git: {len(gz_files)} compressed, {len(sample_files)} sample files")
 
 
 if __name__ == "__main__":
