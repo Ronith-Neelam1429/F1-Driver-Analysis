@@ -57,3 +57,52 @@ def processed_qualifying_path(round_num: int, country: str) -> Path:
 
 def season_summary_path(name: str) -> Path:
     return PROCESSED_DIR / name
+
+
+def iter_processed_qualifying_2025() -> list[tuple[int, str, Path]]:
+    """Yield (round_num, country_slug, path) for each 2025 processed qualifying file.
+
+    Prefers full processed CSV / gzip; falls back to ``_sample.csv`` when only previews exist.
+    """
+    seen: set[int] = set()
+    entries: list[tuple[int, str, Path]] = []
+
+    patterns = (
+        "r*_2025_quali_telemetry_processed.csv",
+        "r*_2025_quali_telemetry_processed.csv.gz",
+    )
+    for pattern in patterns:
+        for path in sorted(PROCESSED_DIR.glob(pattern)):
+            if path.name.endswith("_sample.csv"):
+                continue
+            name = path.name.replace(".gz", "")
+            match = re.match(r"r(\d+)_(.+)_2025_quali_telemetry_processed\.csv$", name)
+            if not match:
+                continue
+            round_num = int(match.group(1))
+            if round_num in seen:
+                continue
+            if _resolved_csv(PROCESSED_DIR / name) is not None:
+                seen.add(round_num)
+                entries.append((round_num, match.group(2), PROCESSED_DIR / name))
+
+    for path in sorted(PROCESSED_DIR.glob("r*_2025_quali_telemetry_processed_sample.csv")):
+        match = re.match(r"r(\d+)_(.+)_2025_quali_telemetry_processed_sample\.csv$", path.name)
+        if not match:
+            continue
+        round_num = int(match.group(1))
+        if round_num in seen:
+            continue
+        seen.add(round_num)
+        entries.append((round_num, match.group(2), path))
+
+    return sorted(entries, key=lambda x: x[0])
+
+
+def _resolved_csv(path: Path) -> Path | None:
+    if path.exists():
+        return path
+    gz_path = Path(str(path) + ".gz")
+    if gz_path.exists():
+        return gz_path
+    return None

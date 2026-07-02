@@ -6,6 +6,7 @@ Run from the project root:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -27,8 +28,15 @@ from src.analysis import (  # noqa: E402
     fastest_lap_telemetry,
     parse_laptime_seconds,
 )
+from src.cluster_plots import (  # noqa: E402
+    build_cluster_radar,
+    build_cluster_scatter,
+    build_driver_cluster_bars,
+)
 from src.data_io import read_csv  # noqa: E402
-from src.paths import QUALIFYING_PROCESSED, RACE_RAW  # noqa: E402
+from src.paths import PROJECT_ROOT, QUALIFYING_PROCESSED, RACE_RAW  # noqa: E402
+
+RESULTS_DIR = PROJECT_ROOT / "results"
 
 st.set_page_config(page_title="F1 Australia 2025 Telemetry", page_icon="🏎️", layout="wide")
 
@@ -67,6 +75,26 @@ def cached_corners(df: pd.DataFrame) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def cached_fastest_lap(df: pd.DataFrame, driver: str) -> pd.DataFrame:
     return fastest_lap_telemetry(df, driver)
+
+
+@st.cache_data(show_spinner="Loading cluster results…")
+def load_cluster_results() -> dict:
+    """Load precomputed clustering outputs from results/."""
+    labels_path = RESULTS_DIR / "driver_clusters.csv"
+    pca_path = RESULTS_DIR / "driver_clusters_pca.csv"
+    profiles_path = RESULTS_DIR / "cluster_profiles.csv"
+    summary_path = RESULTS_DIR / "clustering_summary.json"
+
+    summary = None
+    if summary_path.exists():
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    return {
+        "labels": pd.read_csv(labels_path) if labels_path.exists() else None,
+        "pca": pd.read_csv(pca_path) if pca_path.exists() else None,
+        "profiles": pd.read_csv(profiles_path) if profiles_path.exists() else None,
+        "summary": summary,
+    }
 
 
 def fmt_laptime(seconds: float) -> str:
@@ -113,8 +141,8 @@ st.sidebar.info(
 # --------------------------------------------------------------------------- #
 st.title("Australian Grand Prix 2025 — Qualifying Telemetry")
 
-tab_overview, tab_driver, tab_track, tab_compare, tab_corners = st.tabs(
-    ["📊 Overview", "👤 Driver", "🗺️ Track Map", "⚔️ Compare", "🌀 Corners"]
+tab_overview, tab_driver, tab_track, tab_compare, tab_corners, tab_clusters = st.tabs(
+    ["📊 Overview", "👤 Driver", "🗺️ Track Map", "⚔️ Compare", "🌀 Corners", "🎯 Clusters"]
 )
 
 # --------------------------------------------------------------------------- #
@@ -328,3 +356,58 @@ with tab_corners:
             )
 
         st.dataframe(sub.round(2), hide_index=True, use_container_width=True)
+
+# --------------------------------------------------------------------------- #
+# Clusters (2025 season driving style)
+# --------------------------------------------------------------------------- #
+with tab_clusters:
+    st.subheader("2025 Driving Style Clusters")
+    st.caption(
+        "Clusters from qualifying telemetry across the full 2025 season. "
+        "Features include braking zones, entry/exit speed, lap profiles, and sector ratios."
+    )
+
+    cluster_data = load_cluster_results()
+    labels = cluster_data["labels"]
+    pca = cluster_data["pca"]
+    profiles = cluster_data["profiles"]
+    summary = cluster_data["summary"]
+
+    if labels is None or pca is None:
+        st.warning(
+            "Cluster results not found. Generate them from the project root:\n\n"
+            "```\npython generate_2025_season.py\npython train_driver_clusters.py\n```"
+        )
+    else:
+        if summary is not None:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Drivers clustered", int(summary.get("n_drivers", len(labels))))
+            c2.metric("Clusters", int(summary.get("n_clusters", labels["Cluster"].nunique())))
+            c3.metric("Silhouette score", f"{summary.get('silhouette_score', 0):.3f}")
+
+        st.plotly_chart(
+            build_cluster_scatter(labels, pca),
+            use_container_width=True,
+        )
+
+        col_left, col_right = st.columns(2)
+        with col_left:
+            if profiles is not None:
+                st.plotly_chart(build_cluster_radar(profiles), use_container_width=True)
+            else:
+                st.info("Cluster profiles file not found.")
+        with col_right:
+            st.plotly_chart(build_driver_cluster_bars(labels), use_container_width=True)
+
+        st.subheader("Cluster assignments")
+        table = labels.merge(pca, on="Driver", how="left").sort_values(["Cluster", "Driver"])
+        table["Cluster"] = table["Cluster"].apply(lambda c: f"Cluster {c}")
+        st.dataframe(table, hide_index=True, use_container_width=True)
+
+        if profiles is not None:
+            with st.expander("Cluster feature centroids"):
+                st.dataframe(profiles.round(2), hide_index=True, use_container_width=True)
+
+        plot_file = RESULTS_DIR / "driver_clusters_plot.html"
+        if plot_file.exists():
+            st.caption(f"Full combined plot also saved to `{plot_file.relative_to(PROJECT_ROOT)}`.")
