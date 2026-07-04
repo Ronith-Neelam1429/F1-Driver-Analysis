@@ -110,6 +110,39 @@ def fastest_lap_telemetry(df: pd.DataFrame, driver: str) -> pd.DataFrame:
     return lap.sort_values("TimeInLap").reset_index(drop=True)
 
 
+def average_fastest_lap(df: pd.DataFrame, n_points: int = 400) -> pd.DataFrame:
+    """Mean fastest-lap telemetry across all drivers.
+
+    Each driver's fastest lap is resampled onto a common lap-progress grid
+    (0 -> 1, since laps differ in length/sampling) and the channels are averaged.
+    `TimeInLap` is rebuilt from the mean lap duration so the trace stays in seconds.
+    """
+    grid = np.linspace(0.0, 1.0, n_points)
+    channels = [c for c in ("Speed", "Throttle", "RPM", "X", "Y") if c in df.columns]
+    stacks: dict[str, list[np.ndarray]] = {c: [] for c in channels}
+    durations: list[float] = []
+
+    for driver in df["Driver"].dropna().unique():
+        lap = fastest_lap_telemetry(df, driver)
+        if lap.empty:
+            continue
+        t = lap["TimeInLap"].to_numpy(dtype=float)
+        if t.size < 2 or t.max() <= t.min():
+            continue
+        progress = (t - t.min()) / (t.max() - t.min())
+        durations.append(t.max() - t.min())
+        for c in channels:
+            stacks[c].append(np.interp(grid, progress, lap[c].to_numpy(dtype=float)))
+
+    if not durations:
+        return pd.DataFrame()
+
+    out = pd.DataFrame({"TimeInLap": grid * float(np.mean(durations))})
+    for c in channels:
+        out[c] = np.mean(stacks[c], axis=0)
+    return out
+
+
 def corner_summary(df: pd.DataFrame) -> pd.DataFrame:
     """Per-driver, per-corner min speed and peak accel/decel.
 

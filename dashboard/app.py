@@ -1,4 +1,6 @@
-"""Streamlit dashboard for the Australia 2025 F1 qualifying telemetry analysis.
+"""Streamlit dashboard for the 2025 F1 qualifying telemetry analysis.
+
+Pick a Grand Prix from the sidebar; every tab reflects the selected event.
 
 Run from the project root:
     streamlit run dashboard/app.py
@@ -20,6 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analysis import (  # noqa: E402
+    average_fastest_lap,
     best_laps,
     corner_summary,
     driver_color,
@@ -27,26 +30,75 @@ from src.analysis import (  # noqa: E402
     fastest_lap_telemetry,
     parse_laptime_seconds,
 )
-from src.data_io import read_csv  # noqa: E402
-from src.paths import QUALIFYING_PROCESSED, RACE_RAW  # noqa: E402
 
-st.set_page_config(page_title="F1 Australia 2025 Telemetry", page_icon="🏎️", layout="wide")
+AVG_LABEL = "All drivers (avg)"
+from src.data_io import read_csv, resolve_data_path  # noqa: E402
+from src.paths import (  # noqa: E402
+    PROCESSED_DIR,
+    processed_qualifying_path,
+    season_summary_path,
+)
+
+st.set_page_config(page_title="F1 2025 Qualifying Telemetry", page_icon="🏎️", layout="wide")
 
 
 # --------------------------------------------------------------------------- #
 # Data loading (cached)
 # --------------------------------------------------------------------------- #
-@st.cache_data(show_spinner="Loading telemetry…")
-def load_quali() -> pd.DataFrame:
-    return read_csv(QUALIFYING_PROCESSED)
-
-
 @st.cache_data(show_spinner=False)
-def load_race() -> pd.DataFrame | None:
+def available_events() -> list[dict]:
+    """Discover processed qualifying datasets, labelled from the season schedule."""
+    events: list[dict] = []
+    seen: set[str] = set()
+
     try:
-        return read_csv(RACE_RAW)
+        schedule = read_csv(season_summary_path("schedule_2025.csv"))
     except FileNotFoundError:
-        return None
+        schedule = None
+
+    if schedule is not None:
+        for _, r in schedule.iterrows():
+            rnd = int(r["RoundNumber"])
+            if rnd < 1:  # round 0 is pre-season testing, no qualifying
+                continue
+            path = processed_qualifying_path(rnd, str(r["Country"]))
+            if not resolve_data_path(path).exists():
+                continue
+            events.append(
+                {
+                    "round": rnd,
+                    "name": str(r["EventName"]),
+                    "location": str(r["Location"]),
+                    "label": f"R{rnd:02d} · {r['EventName']}",
+                    "path": path,
+                }
+            )
+            seen.add(resolve_data_path(path).name)
+
+    # Fallback: include any processed file not covered by the schedule.
+    for gz in sorted(PROCESSED_DIR.glob("r*_quali_telemetry_processed.csv.gz")):
+        if gz.name in seen:
+            continue
+        stem = gz.name.split("_2025_")[0]  # e.g. "r07_italy"
+        rnd = int(stem[1:3])
+        slug = stem[4:].replace("_", " ").title()
+        events.append(
+            {
+                "round": rnd,
+                "name": slug,
+                "location": slug,
+                "label": f"R{rnd:02d} · {slug}",
+                "path": gz,
+            }
+        )
+
+    events.sort(key=lambda e: e["round"])
+    return events
+
+
+@st.cache_data(show_spinner="Loading telemetry…")
+def load_quali(path: Path) -> pd.DataFrame:
+    return read_csv(path)
 
 
 @st.cache_data(show_spinner=False)
@@ -69,6 +121,16 @@ def cached_fastest_lap(df: pd.DataFrame, driver: str) -> pd.DataFrame:
     return fastest_lap_telemetry(df, driver)
 
 
+@st.cache_data(show_spinner=False)
+def cached_avg_lap(df: pd.DataFrame) -> pd.DataFrame:
+    return average_fastest_lap(df)
+
+
+def lap_for(df: pd.DataFrame, driver: str) -> pd.DataFrame:
+    """Resolve the lap telemetry for a real driver or the all-driver average."""
+    return cached_avg_lap(df) if driver == AVG_LABEL else cached_fastest_lap(df, driver)
+
+
 def fmt_laptime(seconds: float) -> str:
     """Render seconds as M:SS.mmm."""
     if pd.isna(seconds):
@@ -81,29 +143,34 @@ def fmt_laptime(seconds: float) -> str:
 # --------------------------------------------------------------------------- #
 # Load
 # --------------------------------------------------------------------------- #
-try:
-    quali = load_quali()
-except FileNotFoundError:
+events = available_events()
+if not events:
     st.error(
-        "Processed qualifying data not found.\n\n"
-        "Generate it first with `python process_telemetry.py` "
-        "(it reads the raw FastF1 telemetry and writes the processed `.csv.gz`)."
+        "No processed qualifying data found.\n\n"
+        "Generate it first with `python generate_2025_season.py` "
+        "(it reads the raw FastF1 telemetry and writes the processed `.csv.gz` files)."
     )
     st.stop()
-
-race = load_race()
-drivers = sorted(quali["Driver"].dropna().unique().tolist())
 
 # --------------------------------------------------------------------------- #
 # Sidebar
 # --------------------------------------------------------------------------- #
-st.sidebar.title("🏎️ Australia 2025")
+st.sidebar.title("🏎️ F1 2025")
 st.sidebar.caption("Qualifying telemetry dashboard")
+
+labels = [e["label"] for e in events]
+choice = st.sidebar.selectbox("Grand Prix", labels, index=len(labels) - 1)
+event = events[labels.index(choice)]
+
+quali = load_quali(event["path"])
+drivers = sorted(quali["Driver"].dropna().unique().tolist())
+
 st.sidebar.metric("Telemetry rows", f"{len(quali):,}")
 st.sidebar.metric("Drivers", quali["Driver"].nunique())
-st.sidebar.metric("Corners detected", int(quali["Corner"].nunique()))
+if "Corner" in quali.columns:
+    st.sidebar.metric("Corners detected", int(quali["Corner"].nunique()))
 st.sidebar.info(
-    "Data: FastF1 · Round 1, Albert Park.\n\n"
+    f"Data: FastF1 · Round {event['round']}, {event['location']}.\n\n"
     "Note: corner detection currently resolves a subset of turns, and "
     "acceleration is clipped to ±15 m/s²."
 )
@@ -111,7 +178,7 @@ st.sidebar.info(
 # --------------------------------------------------------------------------- #
 # Header
 # --------------------------------------------------------------------------- #
-st.title("Australian Grand Prix 2025 — Qualifying Telemetry")
+st.title(f"{event['name']} 2025 — Qualifying Telemetry")
 
 tab_overview, tab_driver, tab_track, tab_compare, tab_corners = st.tabs(
     ["📊 Overview", "👤 Driver", "🗺️ Track Map", "⚔️ Compare", "🌀 Corners"]
@@ -165,19 +232,25 @@ with tab_overview:
 # Single driver
 # --------------------------------------------------------------------------- #
 with tab_driver:
-    driver = st.selectbox("Driver", drivers, key="driver_select")
+    driver = st.selectbox("Driver", [AVG_LABEL] + drivers, key="driver_select")
     summary = cached_summary(quali)
-    row = summary[summary["Driver"] == driver]
 
-    if not row.empty:
-        r = row.iloc[0]
+    if driver == AVG_LABEL:
+        r = summary.select_dtypes("number").mean()
+        have_metrics = True
+    else:
+        row = summary[summary["Driver"] == driver]
+        have_metrics = not row.empty
+        r = row.iloc[0] if have_metrics else None
+
+    if have_metrics:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Max speed", f"{r['Max_Speed']:.0f} km/h")
         c2.metric("Avg throttle", f"{r['Avg_Throttle']:.0f}%")
         c3.metric("Time braking", f"{r['Brake_Pct']:.0f}%")
         c4.metric("Max RPM", f"{r['Max_RPM']:.0f}")
 
-    lap = cached_fastest_lap(quali, driver)
+    lap = lap_for(quali, driver)
     if lap.empty:
         st.warning("No valid fastest lap telemetry for this driver.")
     else:
@@ -222,9 +295,9 @@ with tab_driver:
 # Track map
 # --------------------------------------------------------------------------- #
 with tab_track:
-    driver = st.selectbox("Driver", drivers, key="track_driver")
+    driver = st.selectbox("Driver", [AVG_LABEL] + drivers, key="track_driver")
     metric = st.radio("Colour by", ["Speed", "Throttle", "RPM"], horizontal=True)
-    lap = cached_fastest_lap(quali, driver)
+    lap = lap_for(quali, driver)
 
     if lap.empty or lap[["X", "Y"]].isna().all().any():
         st.warning("No position data available for this driver's fastest lap.")
