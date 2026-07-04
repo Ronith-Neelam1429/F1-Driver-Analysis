@@ -28,7 +28,7 @@ data/raw/
 *.xlsx
 
 # Results and outputs
-results/
+!results/*.csv
 *.png
 *.jpg
 *.pdf
