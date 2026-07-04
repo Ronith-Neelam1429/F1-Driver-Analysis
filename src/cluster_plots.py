@@ -13,14 +13,14 @@ from src.analysis import driver_color
 from src.clustering import ClusteringResult
 
 CLUSTER_PALETTE = [
-    "#FF6B6B",
-    "#4ECDC4",
-    "#45B7D1",
-    "#96CEB4",
-    "#FFEAA7",
-    "#DDA0DD",
-    "#98D8C8",
-    "#F7DC6F",
+    "#FF6B6B",  # coral red   (H   0)
+    "#4D96FF",  # blue        (H 218)
+    "#6BCB77",  # green       (H 128)
+    "#9B5DE5",  # purple      (H 270)
+    "#FFD93D",  # yellow      (H  49)
+    "#00C2A8",  # teal        (H 172)
+    "#F15BB5",  # pink        (H 323)
+    "#FF9F45",  # orange      (H  32)
 ]
 
 RADAR_FEATURES = [
