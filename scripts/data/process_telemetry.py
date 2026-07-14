@@ -6,10 +6,10 @@ Process qualifying telemetry with acceleration, deceleration, and corner detecti
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from generate_2025_season import process_round_qualifying
+from scripts.data.generate_2025_season import process_round_qualifying
 
 
 def process_qualifying_telemetry(*, compress: bool = True):
@@ -18,7 +18,7 @@ def process_qualifying_telemetry(*, compress: bool = True):
     if not ok:
         raise FileNotFoundError(
             "Qualifying telemetry not found for Australia 2025. "
-            "Run: python generate_2025_season.py"
+            "Run: python scripts/data/generate_2025_season.py"
         )
 
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.clustering import fit_driver_clusters, save_clustering_model
@@ -35,7 +35,7 @@ def load_2025_qualifying_rounds() -> list[tuple[int, str, pd.DataFrame]]:
 
     if using_samples:
         print(
-            "WARNING: Using _sample.csv previews. Run generate_2025_season.py for full telemetry "
+            "WARNING: Using _sample.csv previews. Run scripts/data/generate_2025_season.py for full telemetry "
             "before trusting cluster assignments."
         )
 

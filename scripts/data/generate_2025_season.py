@@ -15,7 +15,7 @@ warnings.filterwarnings('ignore')
 # Unbuffered progress in long-running jobs
 sys.stdout.reconfigure(line_buffering=True)
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, PROJECT_ROOT)
 
 from src.data_extraction_fastf1 import extract_telemetry_data, extract_2025_data

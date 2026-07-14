@@ -8,6 +8,7 @@ A Python data science project for analyzing Formula 1 driver performance and sta
 F1_Driver_Analysis/
 ├── data/                 # Data storage
 ├── notebooks/            # Jupyter notebooks for exploration
+├── scripts/              # Runnable Python entry points
 ├── src/                  # Source code modules
 ├── results/              # Output files (plots, reports)
 ├── requirements.txt      # Python dependencies
@@ -17,12 +18,14 @@ F1_Driver_Analysis/
 ## Setup
 
 1. **Create a virtual environment:**
+
    ```bash
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 2. **Install dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -31,6 +34,7 @@ F1_Driver_Analysis/
    - Place raw data in `data/` folder
    - Create analysis notebooks in `notebooks/`
    - Add helper functions in `src/`
+   - Run pipeline scripts from `scripts/data/` and modeling jobs from `scripts/modeling/`
    - Save outputs to `results/`
 
 ## Key Libraries
@@ -44,6 +48,7 @@ F1_Driver_Analysis/
 ## Getting Started
 
 Open a Jupyter notebook:
+
 ```bash
 jupyter notebook
 ```
@@ -62,4 +67,4 @@ streamlit run dashboard/app.py
 
 It loads the processed data via `src/data_io.py` (reads the committed
 `.csv.gz` directly — no decompression needed). If the processed file is
-missing, generate it first with `python process_telemetry.py`.
+missing, generate it first with `python scripts/data/process_telemetry.py`.

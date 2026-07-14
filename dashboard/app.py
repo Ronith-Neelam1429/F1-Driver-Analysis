@@ -174,7 +174,7 @@ events = available_events()
 if not events:
     st.error(
         "No processed qualifying data found.\n\n"
-        "Generate it first with `python generate_2025_season.py` "
+        "Generate it first with `python scripts/data/generate_2025_season.py` "
         "(it reads the raw FastF1 telemetry and writes the processed `.csv.gz` files)."
     )
     st.stop()
@@ -448,7 +448,7 @@ with tab_clusters:
     if labels is None or pca is None:
         st.warning(
             "Cluster results not found. Generate them from the project root:\n\n"
-            "```\npython generate_2025_season.py\npython train_driver_clusters.py\n```"
+            "```\npython scripts/data/generate_2025_season.py\npython scripts/modeling/train_driver_clusters.py\n```"
         )
     else:
         if summary is not None:
