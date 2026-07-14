@@ -23,6 +23,20 @@ DRIVER_COLORS = {
     "LAW": "#6692FF", "HAD": "#6692FF",          # Racing Bulls
 }
 
+# Constructor mapping for cluster validation (same groupings as DRIVER_COLORS).
+DRIVER_TO_TEAM = {
+    "VER": "Red Bull", "TSU": "Red Bull",
+    "NOR": "McLaren", "PIA": "McLaren",
+    "LEC": "Ferrari", "HAM": "Ferrari",
+    "RUS": "Mercedes", "ANT": "Mercedes",
+    "ALO": "Aston Martin", "STR": "Aston Martin",
+    "GAS": "Alpine", "DOO": "Alpine", "COL": "Alpine",
+    "ALB": "Williams", "SAI": "Williams",
+    "HUL": "Sauber", "BOR": "Sauber",
+    "OCO": "Haas", "BEA": "Haas",
+    "LAW": "Racing Bulls", "HAD": "Racing Bulls",
+}
+
 DEFAULT_COLOR = "#9AA0A6"
 
 

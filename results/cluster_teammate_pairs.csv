@@ -1,0 +1,13 @@
+Team,Driver_A,Driver_B,Cluster_A,Cluster_B,Same_Cluster
+Alpine,COL,DOO,1,3,False
+Alpine,COL,GAS,1,0,False
+Alpine,DOO,GAS,3,0,False
+Aston Martin,ALO,STR,1,1,True
+Ferrari,HAM,LEC,1,0,False
+Haas,BEA,OCO,1,1,True
+McLaren,NOR,PIA,2,2,True
+Mercedes,ANT,RUS,0,0,True
+Racing Bulls,HAD,LAW,0,0,True
+Red Bull,TSU,VER,1,0,False
+Sauber,BOR,HUL,1,1,True
+Williams,ALB,SAI,1,1,True

@@ -145,16 +145,32 @@ def load_cluster_results() -> dict:
     pca_path = RESULTS_DIR / "driver_clusters_pca.csv"
     profiles_path = RESULTS_DIR / "cluster_profiles.csv"
     summary_path = RESULTS_DIR / "clustering_summary.json"
+    validation_path = RESULTS_DIR / "clustering_validation.json"
+    k_scores_path = RESULTS_DIR / "cluster_k_scores.csv"
+    crosstab_path = RESULTS_DIR / "cluster_team_crosstab.csv"
+    teammates_path = RESULTS_DIR / "cluster_teammate_pairs.csv"
+    stability_path = RESULTS_DIR / "cluster_stability_folds.csv"
 
     summary = None
     if summary_path.exists():
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    validation = None
+    if validation_path.exists():
+        validation = json.loads(validation_path.read_text(encoding="utf-8"))
+    elif summary is not None:
+        validation = summary.get("validation")
 
     return {
         "labels": pd.read_csv(labels_path) if labels_path.exists() else None,
         "pca": pd.read_csv(pca_path) if pca_path.exists() else None,
         "profiles": pd.read_csv(profiles_path) if profiles_path.exists() else None,
         "summary": summary,
+        "validation": validation,
+        "k_scores": pd.read_csv(k_scores_path) if k_scores_path.exists() else None,
+        "team_crosstab": pd.read_csv(crosstab_path, index_col=0) if crosstab_path.exists() else None,
+        "teammate_pairs": pd.read_csv(teammates_path) if teammates_path.exists() else None,
+        "stability_folds": pd.read_csv(stability_path) if stability_path.exists() else None,
     }
 
 
@@ -294,7 +310,7 @@ with tab_driver:
             height=420,
             legend=dict(orientation="h", y=1.1),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         st.subheader("Channel distributions")
         col1, col2 = st.columns(2)
@@ -302,20 +318,20 @@ with tab_driver:
             st.plotly_chart(
                 px.histogram(lap, x="Speed", nbins=40, title="Speed distribution",
                              color_discrete_sequence=[driver_color(driver)]),
-                use_container_width=True,
+                width="stretch",
             )
         with col2:
             if "Gear" in lap.columns:
                 st.plotly_chart(
                     px.histogram(lap, x="Gear", title="Gear usage",
                                  color_discrete_sequence=[driver_color(driver)]),
-                    use_container_width=True,
+                    width="stretch",
                 )
             else:
                 st.plotly_chart(
                     px.histogram(lap, x="RPM", nbins=40, title="RPM distribution",
                                  color_discrete_sequence=[driver_color(driver)]),
-                    use_container_width=True,
+                    width="stretch",
                 )
 
 # --------------------------------------------------------------------------- #
@@ -338,7 +354,7 @@ with tab_track:
         fig.update_yaxes(scaleanchor="x", scaleratio=1)  # keep the track shape correct
         fig.update_layout(height=650, xaxis_title="", yaxis_title="",
                           xaxis_showgrid=False, yaxis_showgrid=False)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         st.caption("Position data from FastF1 (X/Y in track coordinate units).")
 
 # --------------------------------------------------------------------------- #
@@ -361,23 +377,23 @@ with tab_compare:
             st.plotly_chart(
                 px.bar(sub, x="Driver", y="Max_Speed", color="Driver",
                        color_discrete_map=cmap, title="Max speed (km/h)").update_layout(showlegend=False),
-                use_container_width=True,
+                width="stretch",
             )
             st.plotly_chart(
                 px.bar(sub, x="Driver", y="Avg_Throttle", color="Driver",
                        color_discrete_map=cmap, title="Avg throttle (%)").update_layout(showlegend=False),
-                use_container_width=True,
+                width="stretch",
             )
         with col2:
             st.plotly_chart(
                 px.bar(sub, x="Driver", y="Brake_Pct", color="Driver",
                        color_discrete_map=cmap, title="Time on brakes (%)").update_layout(showlegend=False),
-                use_container_width=True,
+                width="stretch",
             )
             st.plotly_chart(
                 px.bar(sub, x="Driver", y="Avg_RPM", color="Driver",
                        color_discrete_map=cmap, title="Avg RPM").update_layout(showlegend=False),
-                use_container_width=True,
+                width="stretch",
             )
 
         st.subheader("Fastest-lap speed traces")
@@ -388,7 +404,7 @@ with tab_compare:
                 fig.add_trace(go.Scatter(x=lap["TimeInLap"], y=lap["Speed"],
                                          name=d, line=dict(color=driver_color(d))))
         fig.update_layout(xaxis_title="Time into lap (s)", yaxis_title="Speed (km/h)", height=450)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 # --------------------------------------------------------------------------- #
 # Corners
@@ -414,7 +430,7 @@ with tab_corners:
                        color_discrete_map={d: driver_color(d) for d in sub["Driver"]},
                        title=f"{corner} — minimum (apex) speed (km/h)")
                 .update_layout(showlegend=False, height=500),
-                use_container_width=True,
+                width="stretch",
             )
         with col2:
             decel = sub.dropna(subset=["Max_Deceleration"]).sort_values("Max_Deceleration")
@@ -424,10 +440,10 @@ with tab_corners:
                        color_discrete_map={d: driver_color(d) for d in decel["Driver"]},
                        title=f"{corner} — peak deceleration (m/s², clipped at -15)")
                 .update_layout(showlegend=False, height=500),
-                use_container_width=True,
+                width="stretch",
             )
 
-        st.dataframe(sub.round(2), hide_index=True, use_container_width=True)
+        st.dataframe(sub.round(2), hide_index=True, width="stretch")
 
 # --------------------------------------------------------------------------- #
 # Clusters (2025 season driving style)
@@ -444,6 +460,7 @@ with tab_clusters:
     pca = cluster_data["pca"]
     profiles = cluster_data["profiles"]
     summary = cluster_data["summary"]
+    validation = cluster_data["validation"]
 
     if labels is None or pca is None:
         st.warning(
@@ -451,34 +468,119 @@ with tab_clusters:
             "```\npython scripts/data/generate_2025_season.py\npython scripts/modeling/train_driver_clusters.py\n```"
         )
     else:
+        internal = (validation or {}).get("internal_metrics") or {}
         if summary is not None:
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
             c1.metric("Drivers clustered", int(summary.get("n_drivers", len(labels))))
             c2.metric("Clusters", int(summary.get("n_clusters", labels["Cluster"].nunique())))
-            c3.metric("Silhouette score", f"{summary.get('silhouette_score', 0):.3f}")
+            c3.metric(
+                "Silhouette",
+                f"{internal.get('silhouette', summary.get('silhouette_score', 0)):.3f}",
+            )
+            db = internal.get("davies_bouldin")
+            c4.metric("Davies–Bouldin ↓", f"{db:.3f}" if db is not None else "—")
 
         st.plotly_chart(
             build_cluster_scatter(labels, pca),
-            use_container_width=True,
+            width="stretch",
         )
 
         col_left, col_right = st.columns(2)
         with col_left:
             if profiles is not None:
-                st.plotly_chart(build_cluster_radar(profiles), use_container_width=True)
+                st.plotly_chart(build_cluster_radar(profiles), width="stretch")
             else:
                 st.info("Cluster profiles file not found.")
         with col_right:
-            st.plotly_chart(build_driver_cluster_bars(labels), use_container_width=True)
+            st.plotly_chart(build_driver_cluster_bars(labels), width="stretch")
 
         st.subheader("Cluster assignments")
         table = labels.merge(pca, on="Driver", how="left").sort_values(["Cluster", "Driver"])
         table["Cluster"] = table["Cluster"].apply(lambda c: f"Cluster {c}")
-        st.dataframe(table, hide_index=True, use_container_width=True)
+        st.dataframe(table, hide_index=True, width="stretch")
 
         if profiles is not None:
             with st.expander("Cluster feature centroids"):
-                st.dataframe(profiles.round(2), hide_index=True, use_container_width=True)
+                st.dataframe(profiles.round(2), hide_index=True, width="stretch")
+
+        st.subheader("Cluster validation")
+        if validation is None:
+            st.info(
+                "Validation metrics not found. Re-run "
+                "`python scripts/modeling/train_driver_clusters.py` to generate them."
+            )
+        else:
+            team_val = validation.get("team_validation", {})
+            teammate_val = validation.get("teammate_agreement", {})
+            ablation = validation.get("ablation", {})
+            stability = validation.get("stability", {})
+
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Team ARI", f"{team_val.get('adjusted_rand_index', 0):.3f}")
+            m2.metric("Team NMI", f"{team_val.get('normalized_mutual_info', 0):.3f}")
+            m3.metric(
+                "Teammate agreement",
+                f"{teammate_val.get('teammate_agreement_rate', 0):.0%}",
+            )
+            mean_ari = stability.get("leave_one_round_mean_ari")
+            m4.metric(
+                "Stability (mean ARI)",
+                f"{mean_ari:.3f}" if mean_ari is not None else "—",
+            )
+            st.caption(
+                "Team ARI/NMI compare clusters to constructors (high ≈ car-driven). "
+                "Teammate agreement is the share of teammate pairs in the same cluster. "
+                "Stability is leave-one-round-out ARI vs the full-season model."
+            )
+
+            val_left, val_right = st.columns(2)
+            with val_left:
+                st.markdown("**Feature ablation** (ARI vs full model)")
+                variants = ablation.get("variants", {})
+                if variants:
+                    abl_rows = [
+                        {
+                            "Variant": name.replace("_", " "),
+                            "ARI vs full": meta.get("ari_vs_full"),
+                            "Silhouette": meta.get("silhouette"),
+                            "Features": meta.get("n_features"),
+                        }
+                        for name, meta in variants.items()
+                    ]
+                    st.dataframe(pd.DataFrame(abl_rows).round(3), hide_index=True, width="stretch")
+                    st.caption(
+                        "High ARI after dropping sector/speed features means clusters are "
+                        "style-driven; low ARI means they were largely pace-driven."
+                    )
+                else:
+                    st.caption("No ablation results available.")
+
+                k_scores = cluster_data["k_scores"]
+                if k_scores is not None and not k_scores.empty:
+                    st.markdown("**k selection scores**")
+                    st.dataframe(k_scores.round(3), hide_index=True, width="stretch")
+                    st.caption(
+                        "Prefer higher silhouette / Calinski–Harabasz and lower Davies–Bouldin."
+                    )
+
+            with val_right:
+                crosstab = cluster_data["team_crosstab"]
+                if crosstab is not None and not crosstab.empty:
+                    st.markdown("**Cluster × team**")
+                    st.dataframe(crosstab, width="stretch")
+
+                pairs = cluster_data["teammate_pairs"]
+                if pairs is not None and not pairs.empty:
+                    st.markdown("**Teammate pairs**")
+                    show = pairs.copy()
+                    if "Same_Cluster" in show.columns:
+                        show["Same_Cluster"] = show["Same_Cluster"].map({True: "Yes", False: "No"})
+                    st.dataframe(show, hide_index=True, width="stretch")
+
+                folds = cluster_data["stability_folds"]
+                if folds is not None and not folds.empty:
+                    with st.expander("Leave-one-round stability folds"):
+                        st.dataframe(folds.round(3), hide_index=True, width="stretch")
 
         plot_file = RESULTS_DIR / "driver_clusters_plot.html"
         if plot_file.exists():

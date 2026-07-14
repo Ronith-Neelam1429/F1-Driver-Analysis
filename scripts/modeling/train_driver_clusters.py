@@ -13,6 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.clustering import fit_driver_clusters, save_clustering_model
 from src.cluster_plots import save_cluster_plots
+from src.cluster_validation import run_cluster_validation, validation_summary_dict
 from src.data_io import read_csv, resolve_data_path
 from src.features import extract_round_driver_features, build_driver_feature_matrix
 from src.paths import iter_processed_qualifying_2025, PROJECT_ROOT as ROOT, _resolved_csv
@@ -89,6 +90,10 @@ def main() -> None:
 
     result = fit_driver_clusters(feature_matrix, n_clusters=args.n_clusters)
 
+    print("\nRunning cluster validation...")
+    validation = run_cluster_validation(result, feature_matrix, per_round)
+    val_summary = validation_summary_dict(validation)
+
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     per_round.to_csv(args.output_dir / "driver_features_per_round.csv", index=False)
@@ -97,14 +102,26 @@ def main() -> None:
     result.pca_coords.to_csv(args.output_dir / "driver_clusters_pca.csv", index=False)
     result.cluster_profiles.to_csv(args.output_dir / "cluster_profiles.csv", index=False)
 
+    validation["k_selection"].to_csv(args.output_dir / "cluster_k_scores.csv", index=False)
+    validation["team"]["crosstab"].to_csv(args.output_dir / "cluster_team_crosstab.csv")
+    validation["teammates"]["pairs"].to_csv(args.output_dir / "cluster_teammate_pairs.csv", index=False)
+    if not validation["stability"]["folds"].empty:
+        validation["stability"]["folds"].to_csv(
+            args.output_dir / "cluster_stability_folds.csv", index=False
+        )
+
     summary = {
         "n_rounds": len(per_round_rows),
         "n_drivers": len(feature_matrix),
         "n_clusters": result.n_clusters,
         "silhouette_score": round(result.silhouette, 4),
+        "validation": val_summary,
     }
     with open(args.output_dir / "clustering_summary.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
+
+    with open(args.output_dir / "clustering_validation.json", "w", encoding="utf-8") as f:
+        json.dump(val_summary, f, indent=2)
 
     model_path = save_clustering_model(result, args.output_dir / "driver_cluster_model.joblib")
     print(f"  Model saved: {model_path.name}")
@@ -116,6 +133,21 @@ def main() -> None:
     print("\nClustering complete")
     print(f"  Clusters: {result.n_clusters}")
     print(f"  Silhouette: {result.silhouette:.3f}")
+    print(f"  Davies–Bouldin: {val_summary['internal_metrics']['davies_bouldin']:.3f}")
+    print(f"  Calinski–Harabasz: {val_summary['internal_metrics']['calinski_harabasz']:.1f}")
+    print(f"  Team ARI: {val_summary['team_validation']['adjusted_rand_index']:.3f}")
+    print(f"  Team NMI: {val_summary['team_validation']['normalized_mutual_info']:.3f}")
+    print(
+        f"  Teammate agreement: {val_summary['teammate_agreement']['teammate_agreement_rate']:.1%} "
+        f"({val_summary['teammate_agreement']['pairs_same_cluster']}/"
+        f"{val_summary['teammate_agreement']['n_teammate_pairs']} pairs)"
+    )
+    for name, meta in val_summary["ablation"]["variants"].items():
+        print(f"  Ablation {name}: ARI vs full = {meta['ari_vs_full']:.3f}")
+    stab = val_summary["stability"]["leave_one_round_mean_ari"]
+    if stab is not None:
+        print(f"  Leave-one-round stability (mean ARI): {stab:.3f}")
+
     print("\nDriver assignments:")
     for _, row in result.labels.sort_values(["Cluster", "Driver"]).iterrows():
         print(f"  Cluster {row['Cluster']}: {row['Driver']}")

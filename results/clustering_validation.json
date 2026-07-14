@@ -1,0 +1,104 @@
+{
+  "internal_metrics": {
+    "silhouette": 0.1405,
+    "davies_bouldin": 1.2849,
+    "calinski_harabasz": 4.5425
+  },
+  "k_selection": {
+    "scores": [
+      {
+        "k": 3,
+        "inertia": 373.3751,
+        "silhouette": 0.1396,
+        "davies_bouldin": 1.6689,
+        "calinski_harabasz": 5.1734
+      },
+      {
+        "k": 4,
+        "inertia": 326.3749,
+        "silhouette": 0.1405,
+        "davies_bouldin": 1.2849,
+        "calinski_harabasz": 4.5425
+      },
+      {
+        "k": 5,
+        "inertia": 286.2561,
+        "silhouette": 0.1147,
+        "davies_bouldin": 1.582,
+        "calinski_harabasz": 4.2164
+      },
+      {
+        "k": 6,
+        "inertia": 249.9314,
+        "silhouette": 0.1169,
+        "davies_bouldin": 1.3147,
+        "calinski_harabasz": 4.0579
+      },
+      {
+        "k": 7,
+        "inertia": 212.9791,
+        "silhouette": 0.1237,
+        "davies_bouldin": 1.1598,
+        "calinski_harabasz": 4.1086
+      },
+      {
+        "k": 8,
+        "inertia": 192.4792,
+        "silhouette": 0.0993,
+        "davies_bouldin": 1.0697,
+        "calinski_harabasz": 3.8162
+      }
+    ],
+    "best_k_silhouette": 4,
+    "best_k_calinski_harabasz": 3,
+    "best_k_davies_bouldin": 8
+  },
+  "team_validation": {
+    "adjusted_rand_index": 0.0648,
+    "normalized_mutual_info": 0.4662,
+    "cluster_purity": 0.3333
+  },
+  "teammate_agreement": {
+    "n_teammate_pairs": 12,
+    "pairs_same_cluster": 7,
+    "teammate_agreement_rate": 0.5833
+  },
+  "ablation": {
+    "full_silhouette": 0.14048470572156893,
+    "variants": {
+      "no_sector_ratios": {
+        "dropped_features": [
+          "Sector1_Ratio",
+          "Sector2_Ratio",
+          "Sector3_Ratio"
+        ],
+        "n_features": 26,
+        "silhouette": 0.139276206448151,
+        "ari_vs_full": 0.5994378074490513
+      },
+      "no_pace_or_speed_profile": {
+        "dropped_features": [
+          "Sector1_Ratio",
+          "Sector2_Ratio",
+          "Sector3_Ratio",
+          "Speed_Pct_10",
+          "Speed_Pct_20",
+          "Speed_Pct_30",
+          "Speed_Pct_40",
+          "Speed_Pct_50",
+          "Speed_Pct_60",
+          "Speed_Pct_70",
+          "Speed_Pct_80",
+          "Speed_Pct_90"
+        ],
+        "n_features": 17,
+        "silhouette": 0.17030026961599548,
+        "ari_vs_full": 0.14563806777217014
+      }
+    }
+  },
+  "stability": {
+    "leave_one_round_mean_ari": 0.5945,
+    "leave_one_round_std_ari": 0.1547
+  }
+}
